@@ -1,88 +1,75 @@
-# Finance — offline personal finance app
+# Finance — Android-ready offline personal finance app
 
-A bilingual (English / বাংলা), offline-first personal finance manager. The UI is a Vite web app packaged for Android with Capacitor. It stores data in the device/browser's IndexedDB; there is no cloud backend and no analytics SDK.
+This is a bilingual English/বাংলা, offline-first personal finance project packaged with Capacitor for Android. It is inspired by the broad layout and workflows in the Pawlet screenshots supplied by the user; it is not Pawlet and does not reproduce Pawlet's proprietary code or online services.
 
-## Features in this starter release
+## Included in this source package
 
-- Dashboard: net account balance, current-month income/expenses, recent activity, category spend and budget progress.
-- Transactions: add/edit income, expenses and transfers; search and filter; date, category, account, payee and notes.
-- Accounts: cash, bank, card, wallet and debt account types; opening balance and calculated running balance.
-- Manual bank details: bank name, account holder, account number, branch and routing/SWIFT code can be entered and edited locally for each bank account. No bank login, PIN, password or OTP is requested.
-- Budgets: monthly category limits and remaining/over-budget indicators.
-- Categories: custom name, type and color.
-- Reports: six-month income/expense chart, category breakdown and CSV export.
-- Tools: recurring-payment definitions, threshold-based smart rules and local flags.
-- Settings: English/বাংলা, BDT/USD/EUR/GBP/INR, dark/light theme, JSON backup/restore, local audit log.
-- Installable web app with a service worker for offline static assets.
+- Dashboard with total balance, monthly income/expense, recent activity and category spend
+- Transactions: income, expense and transfers between two distinct accounts; add/edit/delete, search and filters
+- Accounts: cash, bank, card, wallet and debt; bank name, account holder, account number, branch and routing code
+- Budgets and custom categories
+- Reports: six-month cash-flow chart, category summary and CSV export
+- Recurring payment schedules, threshold rules and local flags
+- Messages page: paste a bank SMS, detect a likely amount/type, review, create a transaction, ignore or delete
+- English and Bengali interface, BDT/USD/EUR/GBP/INR, dark/light themes
+- JSON backup/restore and local audit log
+- Offline static assets via service worker
+- GitHub Actions workflow to build a debug APK
 
-## Important scope notes
+## Important limitations — read before using
 
-This release is a useful offline personal-finance foundation, not a complete implementation of every Pawlet online service. Since the selected mode is offline-only, it does **not** connect to banks, Gmail, Discord, Slack, cloud sync, online subscription billing, or remote notifications. Recurring items are stored as schedules; automatic posting/notifications are not yet implemented. Transfers are recorded as transaction entries but this starter does not model paired source/destination accounts. Account balances are calculated from opening balances plus income minus expenses.
+This package is a functional offline finance starter, **not yet a complete Pawlet-equivalent production app**. In particular:
 
-No financial app can guarantee security simply by being offline. The app currently does not encrypt the IndexedDB database. Protect the phone with device encryption/lock, export backups carefully, and do not store bank credentials, card PINs, or recovery phrases here. A future production release should add an app PIN/biometric gate, encrypted database and tested migration/backup flows.
+- It does not automatically read the phone's SMS inbox. Messages must be pasted/imported by the user. Android SMS permissions are highly restricted by Google Play policy and require an eligible/default-SMS-handler design or an approved exception.
+- It does not yet include native biometric authentication or a hardened app PIN gate. Do not treat the app as a secure vault.
+- Local IndexedDB data is not encrypted at rest. Device lock and encrypted device storage are recommended; never enter card PINs, OTPs, passwords or bank login credentials.
+- Recurring payments are schedules only; there is no guaranteed background posting or notification engine.
+- No bank API, Gmail, cloud sync, AI message service, automatic bank reconciliation or remote notifications are connected.
+- This is a debug APK build workflow, not a signed Play Store release.
 
-## Run locally
+Do not use this starter as the sole record of financial activity. Export backups regularly and verify all imported SMS transactions before saving.
 
-Requirements: Node.js 20+ for the optional build script. The app can also be served as static files.
+## Build APK with GitHub Actions
 
-```bash
-npm install
-npm run start
-```
+1. Create/open your GitHub repository. Upload **all files and folders in this ZIP**, including the hidden `.github` folder, to the repository root (not the ZIP file itself).
+2. Commit the files to the `main` branch. The workflow `.github/workflows/main.yml` runs automatically on push.
+3. Open the repository's **Actions** tab and select the latest **Build Finance Android APK** run. Wait for a green Success status.
+4. Under **Artifacts**, download `Finance-debug-apk`. Extract the downloaded ZIP and install `app-debug.apk` on Android.
+5. If Android blocks installation, allow your browser/file manager to install unknown apps.
 
-Open the local Vite URL. Use HTTPS or localhost for service-worker/offline testing.
+Requirements for a manual build: Node.js 20+, Java 21, Android SDK and Capacitor-compatible Gradle.
 
-## Build Android APK
-
-Requirements: Node.js 20+, Android Studio, Android SDK, Java 17+, and Gradle supported by the installed Capacitor Android version.
+## Local build commands
 
 ```bash
 npm install
 npm run build
-npx cap add android       # first time only; creates the native android/ project
+npx cap add android       # first time only
 npx cap sync android
-npx cap open android      # build > Build APK in Android Studio
+cd android && ./gradlew assembleDebug
 ```
 
-Or, after Android Studio/SDK/Gradle are configured:
+APK output: `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-```bash
-npm run android:apk
-```
+## Android native security and SMS integration (v2)
 
-Debug APK output is normally `android/app/build/outputs/apk/debug/app-debug.apk`.
+The Android workflow runs `scripts/prepare-android.mjs` after `npx cap add android`. It copies and registers a custom Capacitor plugin and adds the Android SMS receiver.
 
-For a release APK, configure a signing key in Android Studio and use **Build > Generate Signed Bundle / APK**. Never commit your signing key or passwords.
+- First launch: create a 4-digit PIN. The PIN is stored as a salted PBKDF2-HMAC-SHA256 hash (150,000 iterations), not as plaintext.
+- App lock: PIN is required at launch and after the WebView is backgrounded and resumed. Android `FLAG_SECURE` prevents screenshots and task-switcher previews.
+- Biometrics: optional AndroidX BiometricPrompt unlock; enabled after a successful biometric/device-credential prompt.
+- Local data encryption: the IndexedDB app-state value is encrypted as AES-256-GCM using a non-exportable Android Keystore key. The PIN gates app access; it is not itself the encryption key.
+- SMS: the user explicitly grants READ_SMS and RECEIVE_SMS. The Messages screen can import recent inbox messages for review. A background SMS_RECEIVED receiver encrypts transaction-like incoming messages into a pending queue and posts a generic notification. On next unlock, Finance imports them into Messages for review; it does not silently create a financial transaction.
+- Android 13+ notification permission is requested alongside SMS permission.
 
-## Data backup
+### Important limitations and safety notes
 
-Use Settings → Export backup regularly. The JSON file contains your financial records in readable form; store it securely. Import replaces the current local data after confirmation.
-
-## Project structure
-
-- `src/main.js` — application state, IndexedDB persistence, UI and feature logic.
-- `src/style.css` — responsive visual design and themes.
-- `sw.js` — offline asset cache.
-- `manifest.webmanifest` — installable web app metadata.
-- `capacitor.config.json` — Android wrapper identity and web build path.
-
-## Maintenance
-
-1. Edit `src/main.js` or `src/style.css`.
-2. Run `npm run build`.
-3. For Android, run `npx cap sync android` and rebuild from Android Studio.
-4. When changing persisted data structures, increment the IndexedDB database version and write an explicit migration before shipping.
+SMS permissions are highly restricted by Google Play policy; this project is intended for personal sideloaded testing, and permission availability depends on Android version/device policy. Some OEMs may restrict background delivery. SMS parsing is heuristic and must be reviewed before creating a transaction. Notification content is deliberately generic to avoid exposing amounts on the lock screen. JSON/CSV exports are plaintext; protect exported files. The custom native integration must be built and tested on a real Android device before relying on it. This source has not been independently security-audited.
 
 
-## Build APK from Android phone using GitHub Actions
+## Automatic bank profile detection + backup/restore (v4)
 
-1. Create a GitHub repository named `Finance`.
-2. Extract this project ZIP on your phone using a ZIP/file manager.
-3. Upload the contents of the `Finance` folder (including the hidden `.github` folder) to the repository's `main` branch. If your file manager hides dot-folders, enable "show hidden files".
-4. Open the repository's **Actions** tab and allow GitHub Actions if asked.
-5. Run **Build Finance Android APK** using **Run workflow**, or push a commit to `main`.
-6. Wait for the workflow to finish successfully.
-7. Open the completed workflow run, scroll to **Artifacts**, and download `Finance-debug-apk`.
-8. Extract the artifact ZIP; install `app-debug.apk` on your Android phone. Allow "Install unknown apps" for the browser/file manager if Android asks.
-
-The workflow builds a debug APK for personal testing. It is not a Play Store release or a security-audited financial product. The app's local database is not encrypted in this starter release; do not store sensitive bank credentials.
+- When a bank SMS is imported or pasted, Finance checks known Bangladesh bank/MFS sender and message patterns, detects the institution when identifiable, and stores only the masked account suffix when present. A matching bank account profile is created/updated automatically and linked to the queued SMS transaction. No bank-detail form entry is required.
+- SMS usually does not contain the account holder, full account number, branch or routing number. Finance deliberately does not fabricate these values; those fields cannot be reliably auto-filled without a supported bank API or statement import.
+- Settings includes JSON backup export and restore. Backup contains the complete app state, including account profiles, transactions, categories, budgets, recurring rules and message history. Restore validates the JSON structure and asks for confirmation before replacing local data. Exported backup files are plaintext; keep them private.
+- Footer attribution: Development by ©Tanber Ahammed.
