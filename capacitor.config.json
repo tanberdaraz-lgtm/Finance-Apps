@@ -1,0 +1,6 @@
+{
+  "appId": "app.finance.offline",
+  "appName": "Finance",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" }
+}
